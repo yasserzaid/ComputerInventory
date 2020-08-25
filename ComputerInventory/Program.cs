@@ -7,6 +7,9 @@ using ComputerInventory.Context;
 
 namespace ComputerInventory
 {
+    /// <summary>
+    /// 
+    /// </summary>
     class Program
     {
         static void Main(string[] args)
