@@ -49,6 +49,8 @@ namespace ComputerInventory.Configuration
                .HasForeignKey(d => d.OperatingSysId)
                .OnDelete(DeleteBehavior.ClientSetNull)
                .HasConstraintName("FK_OperatingSys");
+
+            //builder.Property(a => a.OperatingSysId).IsConcurrencyToken();
         }
     }
 }

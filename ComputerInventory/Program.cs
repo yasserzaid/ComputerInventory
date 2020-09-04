@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ComputerInventory.Models;
 using ComputerInventory.Context;
+using System.Data.Common;
 
 namespace ComputerInventory
 {
@@ -14,6 +15,21 @@ namespace ComputerInventory
     {
         static void Main(string[] args)
         {
+            //DisplaySpecificMachineData();
+            //DisplaySpecificMachineData2();
+            //DisplayMachineNameAndIdOnly();
+            //LeftOuterJoin();
+            //RightOuterJoin();
+            //CrossJoin();
+            //InnerJoin();
+            //GroupMachinesByOS(); // Not Working
+            //GroupMachineByType();
+            //LogicalAnd(); // Not Working
+            //LogicalOr();
+            //PageAndFilterOperatingSystems(); // Not Working
+
+            //return;
+
             // Set a color you like other than green or red as this will be used later
             Console.ForegroundColor = ConsoleColor.White;
             int result = -1;
@@ -39,6 +55,7 @@ namespace ComputerInventory
                 Console.WriteLine("3. Data Entry Menu");
                 Console.WriteLine("4. Data Modification Menu");
                 Console.WriteLine("5. Update Operating Systems");
+                Console.WriteLine("6. Testing");
                 Console.WriteLine("9. Exit");
                 cki = Console.ReadKey();
                 try
@@ -64,6 +81,12 @@ namespace ComputerInventory
                     else if (result == 5)
                     {
                         UpdateOperatingSystems();
+                    }
+                    else if (result == 6)
+                    {
+                        Console.WriteLine();
+                        PageAndFilterOperatingSystems();
+                        Console.ReadKey();
                     }
                     else if (result == 9)
                     {
@@ -1241,6 +1264,7 @@ namespace ComputerInventory
                        .Include(p => p.WarrantyProvider)
                        .Where(x => x.MachineId == mach.MachineId).FirstOrDefault();
                 }
+
                 //Console.Clear();
                 //Console.WriteLine("To Update the Machine Information Press 1");
                 //Console.WriteLine($"Name: {mach.Name}  General Role: { mach.GeneralRole}");
@@ -1436,6 +1460,471 @@ namespace ComputerInventory
                     context.Update(m);
                 }
                 context.SaveChanges();
+            }
+        }
+
+        static void DisplaySpecificMachineData()
+        {
+            using (var context = new MachineContext())
+            {
+                var machines = (from m in context.Machine
+                                join o in context.OperatingSys on m.OperatingSysId equals o.OperatingSysId
+                                where m.MachineTypeId == 1
+                                select new { MachineName = m.Name, Role = m.GeneralRole, OperatingSystem = o.Name });
+
+                foreach (var m in machines)
+                {
+                    Console.WriteLine($"{m.MachineName}  {m.OperatingSystem}  {m.Role}");
+                }
+            }
+        }
+
+        static void DisplaySpecificMachineData2()
+        {
+            using (var context = new MachineContext())
+            {
+                var machines = (from m in context.Machine
+                                join o in context.OperatingSys on m.OperatingSysId equals o.OperatingSysId
+                                where m.MachineTypeId == 1
+                                select new { m.Name, m.GeneralRole, OperatingSystem = o.Name });
+
+                foreach (var m in machines)
+                {
+                    Console.WriteLine($"{m.Name}  {m.OperatingSystem}  {m.GeneralRole}");
+                }
+            }
+        }
+
+        static void DisplayMachineNameAndIdOnly()
+        {
+            using (var context = new MachineContext())
+            {
+                var machines = (from m in context.Machine
+                                where m.MachineTypeId == 1
+                                select new { m.MachineId, m.Name });
+
+                foreach (var m in machines)
+                {
+                    Console.WriteLine($"{m.MachineId} {m.Name}");
+                }
+            }
+        }
+
+        static void LeftOuterJoin()
+        {
+            using (var context = new MachineContext())
+            {
+                var leftJoin = from M in context.Machine
+                               join MW in context.MachineWarranty on M.MachineId equals MW.MachineId into lJoin
+                               from MW in lJoin.DefaultIfEmpty()
+                               select new
+                               {
+                                   machineId = M.MachineId,
+                                   machineName = M.Name,
+                                   providerId = MW != null ? MW.WarrantyProviderId : (int?)null
+                               };
+
+                foreach (var lj in leftJoin)
+                {
+                    string pId;
+                    if (lj.providerId == null) { pId = "null"; }
+                    else { pId = lj.providerId.ToString(); }
+
+                    Console.WriteLine($"{lj.machineId} {lj.machineName}  {pId}");
+                }
+            }
+        }
+
+        static void RightOuterJoin()
+        {
+            using (var context = new MachineContext())
+            {
+                var dataBaseConnection = context.Database.GetDbConnection();
+                dataBaseConnection.Open();
+                using (var cmd = dataBaseConnection.CreateCommand())
+                {
+                    string eSQL = "SELECT MW.MachineID, M.Name, MW.WarrantyProviderID, mw.WarrantyExpiration FROM MachineWarranty AS MW RIGHT OUTER JOIN Machine AS M ON MW.MachineID = M.MachineID";
+                    cmd.CommandText = eSQL;
+                    DbDataReader reader = cmd.ExecuteReader();
+
+                    if (reader.HasRows)
+                    {
+                        while (reader.Read())
+                        {
+                            string mId;
+                            if (reader.IsDBNull(0))
+                            {
+                                mId = "Null";
+                            }
+                            else
+                            {
+                                mId = reader.GetInt32(0).ToString();
+                            }
+
+                            string machineName = reader.GetString(1);
+
+                            string warrantyProviderId;
+                            if (reader.IsDBNull(2))
+                            {
+                                warrantyProviderId = "Null";
+                            }
+                            else
+                            {
+                                warrantyProviderId = reader.GetInt32(2).ToString();
+                            }
+
+                            string warrantyExpiration;
+                            if (reader.IsDBNull(3))
+                            {
+                                warrantyExpiration = "Null";
+                            }
+                            else
+                            {
+                                warrantyExpiration = reader.GetDateTime(3).ToShortDateString();
+                            }
+                            Console.WriteLine($"{mId} {machineName} {warrantyProviderId} {warrantyExpiration}");
+                        }
+                    }
+                    dataBaseConnection.Close();
+                }
+
+                Console.WriteLine();
+                
+                // Another Way
+                var rightJoin = from mw in context.MachineWarranty
+                                join m in context.Machine on mw.MachineId equals m.MachineId into rJoin
+                                from m in rJoin.DefaultIfEmpty()
+                                select new
+                                {
+                                    machineId = m != null ? m.MachineId : (int?)null,
+                                    machineName = m.Name,
+                                    warrantyProviderId = mw != null ? mw.WarrantyProviderId : (int?)null,
+                                    warrantyExpiration = mw != null ? mw.WarrantyExpiration : (DateTime?)null
+                                };
+
+                foreach (var rj in rightJoin)
+                {
+                    string mId;
+                    string machineName;
+                    string warrProv;
+                    string warrExp;
+                    machineName = rj.machineName;
+                    if (rj.machineId == null) { mId = "null"; }
+                    else { mId = rj.machineId.ToString(); }
+                    if (rj.warrantyProviderId == null) { warrProv = "null"; }
+                    else { warrProv = rj.warrantyProviderId.ToString(); }
+                    if (rj.warrantyExpiration == null) { warrExp = "null"; }
+                    else { warrExp = rj.warrantyExpiration.ToString(); }
+
+                    Console.WriteLine(value: $"{mId} {machineName} {warrProv} {warrExp}");
+                }
+            }
+        }
+
+        static void CrossJoin()
+        {
+            using (var _context = new MachineContext())
+            {
+                var crossJoin = from m in _context.Machine
+                                from mw in _context.MachineWarranty
+                                select new
+                                {
+                                    m,
+                                    mw
+                                };
+
+                int counter = 1;
+                foreach (var cj in crossJoin)
+                {
+                    Console.WriteLine($"Row: {counter++}\t{cj.m.MachineId} {cj.m.Name} { cj.mw.WarrantyProviderId} {cj.mw.WarrantyExpiration}");
+                }
+            }
+        }
+
+        static void InnerJoin()
+        {
+            using (var context = new MachineContext())
+            {
+                //var mw = context.MachineWarranty
+                //   .Join(context.WarrantyProvider, m => m.WarrantyProviderId, p => p.WarrantyProviderId, (m, p) => new
+                //   {
+                //       machineId = m.MachineId,
+                //       warrantyProvider = p.ProviderName,
+                //       warrantyExpiration = m.WarrantyExpiration,
+                //       supportNumber = p.SupportNumber
+                //   });
+
+                // Another Way
+                var mw = from m in context.MachineWarranty
+                         join p in context.WarrantyProvider
+                         on m.WarrantyProviderId equals p.WarrantyProviderId
+                         select new
+                         {
+                             machineId = m.MachineId,
+                             warrantyProvider = p.ProviderName,
+                             warrantyExpiration = m.WarrantyExpiration,
+                             supportNumber = p.SupportNumber
+                         };
+
+                foreach (var m in mw)
+                {
+                    Console.WriteLine($"MachineID: {m.machineId} Warranty Provider: {m.warrantyProvider}");
+                    Console.WriteLine($"Warranty Expiration: {m.warrantyExpiration.ToShortDateString()} Support Number: {m.supportNumber}");
+                    Console.WriteLine("----------------------------------------"); // 40 dashes
+                }
+            }
+        }
+
+        static void GroupMachinesByOS()
+        {
+            using (var context = new MachineContext())
+            {
+                var mli = (from m in context.Machine
+                           join o in context.OperatingSys on m.OperatingSysId equals o.OperatingSysId
+                           group new { m, o } by m.OperatingSysId into grouped
+                           select new { grouped.Key, count = grouped.Select(x => x.m.OperatingSysId).Count(), Name = grouped.Select(ma => ma.o.Name) });
+
+                //var mli = from m in context.Machine
+                //          join o in context.OperatingSys
+                //          on m.OperatingSysId equals o.OperatingSysId
+                //          select new { m.OperatingSys.Name, m.OperatingSysId } into x
+                //          group x by new { x.OperatingSysId } into g
+                //          select new
+                //          {
+                //              Key = g.Key.OperatingSysId,
+                //              count = g.Select(x => x.OperatingSysId).Count(),
+                //              Name = g.Select(x => x.Name)
+                //          };
+
+                foreach (var m in mli)
+                {
+                    Console.WriteLine($"OS ID: {m.Key} Machine Count W/OS: {m.count} OS Name: {m.Name.ElementAt(0)}");
+                }
+            }
+        }
+
+        static void GroupMachineByType()
+        {
+            using (var context = new MachineContext())
+            {
+                var mType = context.Machine
+                   .GroupBy(m => m.MachineTypeId)
+                   .Select(g => new { id = g.Key, count = g.Count() });
+
+                foreach (var m in mType)
+                {
+                    Console.WriteLine($"{m.id}  {m.count}");
+                }
+            }
+        }
+
+        //static void LogicalAnd() {
+        //    using (var context = new MachineContext()) {
+        //        var lOs = (from m in context.Machine
+        //                   join o in context.OperatingSys on m.OperatingSysId equals o.OperatingSysId
+        //                   group new { m, o } by m.OperatingSysId into grouped
+        //                   select new { grouped.Key, count = grouped.Select(x => x.m.OperatingSysId).Count(), Name = grouped.Select(ma => ma.o.Name) });
+
+        //        foreach (var os in lOs) {
+        //            List<Machine> lMachine = context.Machine.Where(x => x.MachineTypeId == 1 && x.OperatingSysId == os.Key).ToList();
+        //            if (lMachine.Count > 0) {
+        //                Console.WriteLine($"Servers Running {os.Name.ElementAt(0)}");
+        //                foreach (Machine m in lMachine) {
+        //                    Console.WriteLine($"\tName: {m.Name}\tRole: {m.GeneralRole}");
+        //                }
+        //                Console.WriteLine();
+        //            }
+        //        }
+        //    }
+        //}
+
+        static void LogicalAnd()
+        {
+            using (var context = new MachineContext())
+            {
+                DateTime start = DateTime.Now;
+                var lOs = (from m in context.Machine
+                           join o in context.OperatingSys on m.OperatingSysId equals o.OperatingSysId
+                           group new { m, o } by m.OperatingSysId into grouped
+                           select new { grouped.Key, count = grouped.Select(x => x.m.OperatingSysId).Count(), Name = grouped.Select(ma => ma.o.Name) });
+
+                foreach (var os in lOs)
+                {
+                    List<Machine> lMachine = context.Machine.Where(x => x.MachineTypeId == 1 && x.OperatingSysId == os.Key).ToList();
+                    if (lMachine.Count > 0)
+                    {
+                        Console.WriteLine($"Servers Running {os.Name.ElementAt(0)}");
+                        foreach (Machine m in lMachine)
+                        {
+                            Console.WriteLine($"\tName: {m.Name}\tRole: {m.GeneralRole}");
+                        }
+                        Console.WriteLine();
+                    }
+                }
+                DateTime end = DateTime.Now;
+                TimeSpan ts = end.Subtract(start);
+                Console.WriteLine($"It took {ts.Milliseconds} ms to run");
+
+                start = DateTime.Now;
+                Console.WriteLine("Using a where clause for the same results...");
+                var lOs2 = (from m in context.Machine
+                            join o in context.OperatingSys on m.OperatingSysId equals o.OperatingSysId
+                            where m.MachineTypeId == 1
+                            group new { m, o } by m.OperatingSysId into grouped
+                            select new { grouped.Key, count = grouped.Select(x => x.m.OperatingSysId).Count(), Name = grouped.Select(ma => ma.o.Name) });
+
+                foreach (var os in lOs2)
+                {
+                    List<Machine> lMachine = context.Machine.Where(x => x.OperatingSysId == os.Key).ToList();
+                    if (lMachine.Count > 0)
+                    {
+                        Console.WriteLine($"Servers Running {os.Name.ElementAt(0)}");
+                        foreach (Machine m in lMachine)
+                        {
+                            Console.WriteLine($"\tName: {m.Name}\tRole: {m.GeneralRole}");
+                        }
+                        Console.WriteLine();
+                    }
+                }
+                end = DateTime.Now;
+                ts = end.Subtract(start);
+                Console.WriteLine($"It took {ts.Milliseconds} ms to run");
+            }
+        }
+
+        /// <summary>
+        /// Updated by Yasser
+        /// </summary>
+        static void LogicalOr()
+        {
+            using (var context = new MachineContext())
+            {
+                var machines = from m in context.Machine
+                               join o in context.OperatingSys on m.OperatingSysId equals o.OperatingSysId //into mj
+                               where (m.OperatingSysId == 1 || m.OperatingSysId == 5)
+                               orderby m.OperatingSysId
+                               select new { mName = m.Name, osName = m.OperatingSys.Name };
+
+                foreach (var m in machines)
+                {
+                    Console.WriteLine($"{m.mName} is running {m.osName}");
+                }
+            }
+        }
+
+        static void PageAndFilterOperatingSystems()
+        {
+            ConsoleKeyInfo cki;
+            string result;
+            bool cont = false;
+            System.Linq.Expressions.Expression<Func<OperatingSys, bool>> whereClause = o => o.StillSupported == true;
+            string pageOptions = "";
+            List<OperatingSys> lOperatingSys;
+            Console.Clear();
+            Console.WriteLine("Do you want to display all of the Operating Systems in one list? [y or n]");
+            do
+            {
+                cki = Console.ReadKey(true);
+                result = cki.KeyChar.ToString();
+                cont = ValidateYorN(result);
+            } while (!cont);
+
+            if (result.ToLower() == "y")
+            {
+                DisplayOperatingSystems();
+            }
+            else
+            {
+                Console.WriteLine("Do you want to view [a]ll, [s]upported operating systems or [u]nsupported operating systems?");
+                cont = false;
+                do
+                {
+                    cki = Console.ReadKey(true);
+                    if (cki.Key == ConsoleKey.A || cki.Key == ConsoleKey.S || cki.Key == ConsoleKey.U)
+                    {
+                        result = cki.KeyChar.ToString();
+                        cont = true;
+                    }
+                } while (!cont);
+                if (result.ToLower() == "a")
+                {
+                    whereClause = o => o.StillSupported == true || o.StillSupported == false;
+                }
+                else if (result.ToLower() == "s")
+                {
+                    whereClause = o => o.StillSupported == true;
+                }
+                else if (result.ToLower() == "u")
+                {
+                    whereClause = o => o.StillSupported == false;
+                }
+                int pageSize;
+                int pageIndex = 0;
+                Console.WriteLine("How many results do you want per page, enter a number between 3 and 5");
+                cont = false;
+                do
+                {
+                    cki = Console.ReadKey(true);
+                    if (cki.Key == ConsoleKey.D3 || cki.Key == ConsoleKey.D4 || cki.Key == ConsoleKey.D5)
+                    {
+                        result = cki.KeyChar.ToString();
+                        cont = true;
+                    }
+                } while (!cont);
+                pageSize = Convert.ToInt16(result);
+                cont = false;
+                do
+                {
+                    Console.Clear();
+                    using (var context = new MachineContext())
+                    {
+                        lOperatingSys = context.OperatingSys
+                           .Where(whereClause)
+                           .OrderBy(i => i.OperatingSysId)
+                           .Skip(pageIndex * pageSize)
+                           .Take(pageSize)
+                           .ToList();
+                    }
+                    foreach (OperatingSys os in lOperatingSys)
+                    {
+                        Console.Write($"Name: {os.Name,-39}\tStill Supported = ");
+                        if (os.StillSupported == true)
+                        {
+                            Console.ForegroundColor = ConsoleColor.Green;
+                        }
+                        else
+                        {
+                            Console.ForegroundColor = ConsoleColor.Red;
+                        }
+                        Console.WriteLine(os.StillSupported);
+                        Console.ForegroundColor = ConsoleColor.Black;
+                    }
+                    if (pageIndex == 0)
+                    {
+                        pageOptions = "Hit Esc to exit\tN for Next";
+                    }
+                    else
+                    {
+                        pageOptions = "Hit Esc to exit\tN for Next\tP for Previous";
+                    }
+                    Console.WriteLine($"Page: {pageIndex}\t{pageOptions}");
+                    cki = Console.ReadKey(true);
+                    if (cki.Key == ConsoleKey.Escape)
+                    {
+                        cont = true;
+                    }
+                    else if (cki.Key == ConsoleKey.N)
+                    {
+                        pageIndex++;
+                    }
+                    else if (cki.Key == ConsoleKey.P)
+                    {
+                        if (pageIndex > 0)
+                        {
+                            pageIndex--;
+                        }
+                    }
+                } while (!cont);
             }
         }
 

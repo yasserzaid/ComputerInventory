@@ -32,6 +32,7 @@ namespace ComputerInventory.Models
         public string InstalledRoles { get; set; }
         
         //[Column("OperatingSysID")]
+        [ConcurrencyCheck]
         public int OperatingSysId { get; set; }
         
         public int MachineTypeId { get; set; }
