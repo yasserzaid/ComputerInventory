@@ -5,6 +5,7 @@ using System.Linq;
 using ComputerInventory.Models;
 using ComputerInventory.Context;
 using System.Data.Common;
+using System.ComponentModel.DataAnnotations;
 
 namespace ComputerInventory
 {
@@ -56,6 +57,7 @@ namespace ComputerInventory
                 Console.WriteLine("4. Data Modification Menu");
                 Console.WriteLine("5. Update Operating Systems");
                 Console.WriteLine("6. Testing");
+                Console.WriteLine("7. Support Tickets and Log");
                 Console.WriteLine("9. Exit");
                 cki = Console.ReadKey();
                 try
@@ -87,6 +89,10 @@ namespace ComputerInventory
                         Console.WriteLine();
                         PageAndFilterOperatingSystems();
                         Console.ReadKey();
+                    }
+                    else if(result==7)
+                    {
+                        SupportMenu();
                     }
                     else if (result == 9)
                     {
@@ -914,6 +920,23 @@ namespace ComputerInventory
                 SupportNumber = phoneNumber,
                 SupportExtension = extension
             };
+
+            // Model Validation using DataAnnotations
+            var vResults = new List<ValidationResult>();
+            var vContext = new ValidationContext(wp);
+            bool isValid = Validator.TryValidateObject(wp, vContext, vResults, true);
+
+            if (!isValid)
+            {
+                Console.WriteLine();
+                foreach (var res in vResults)
+                {
+                    Console.WriteLine($"{((string[])res.MemberNames)[0]} threw an error of:\r\n\t {res.ErrorMessage.ToString()}");
+                }
+                Console.ReadKey();
+                wp = CreateNewWarrantyProvider();
+            }
+
             return wp;
         }
 
@@ -1215,6 +1238,28 @@ namespace ComputerInventory
                 }
             } while (!cont);
             return numbers;
+        }
+
+        static string DisplayAllMachines(string textToDisplay = "Enter the MachineId followed by the Enter Key for more information")
+        {
+            Console.Clear();
+            List<Machine> lMachine = GetListOfMachines();
+            Console.WriteLine("Machine ID | Machine Name");
+            foreach (Machine m in lMachine)
+            {
+                Console.WriteLine($"{m.MachineId,-11}| {m.Name}");
+            }
+            Console.WriteLine();
+            Console.WriteLine(textToDisplay);
+            Console.WriteLine("Hit the Esc key at anytime to exit the menu.");
+
+            string machineId = GetNumbersFromConsole();
+            if (machineId.Length > 0)
+            {
+                int machId = Convert.ToInt32(machineId);
+                DisplayMachineDetail(machId);
+            }
+            return machineId;
         }
 
         static void DisplayMachineDetail(int machineId)
@@ -1926,6 +1971,139 @@ namespace ComputerInventory
                     }
                 } while (!cont);
             }
+        }
+
+        static void SupportMenu()
+        {
+            ConsoleKeyInfo cki;
+            int result = -1;
+            bool cont = false;
+            SupportTicketLogEntry cSupportTicketLogEntry = new SupportTicketLogEntry();
+            do
+            {
+                Console.Clear();
+                WriteHeader("Support Menu");
+                Console.WriteLine("\r\nPlease select from the list below for what you would like to do today");
+                Console.WriteLine("1. Create a New Support Ticket");
+                Console.WriteLine("2. Update a Support Ticket");
+                Console.WriteLine("3. View All Tickets");
+                Console.WriteLine("9. Exit Menu");
+                cki = Console.ReadKey();
+                try
+                {
+                    result = Convert.ToInt16(cki.KeyChar.ToString());
+                    if (result == 1)
+                    {
+                        CreateSupportTicket();
+                    }
+                    else if (result == 2)
+                    {
+                        cSupportTicketLogEntry.UpdateSupportTicket();
+                    }
+                    else if (result == 3)
+                    {
+                        DisplaySupportTickets();
+                    }
+                    else if (result == 9)
+                    {
+                        // We are exiting so nothing to do
+                        cont = true;
+                    }
+                }
+                catch (System.FormatException)
+                {
+                    // a key that wasn't a number
+                }
+            } while (!cont);
+        }
+
+        static void CreateSupportTicket()
+        {
+            string ticketOpenedBy = Environment.UserName;
+            DateTime dateReported = DateTime.Now;
+            int machineId;
+            string issueDescription;
+            string issueDetail;
+
+            string tempMachineId = DisplayAllMachines("Enter the MachineId followed by the Enter Key for our Support Ticket.");
+            bool machineIdReturned = Int32.TryParse(tempMachineId, out machineId);
+            if (machineIdReturned)
+            {
+                Console.WriteLine("\r\nEnter a brief description of the issue:");
+                issueDescription = GetTextFromConsole(5, false);
+                Console.WriteLine("\r\nEnter a detailed description of the issue:");
+                issueDetail = GetTextFromConsole(5, false);
+                SupportTicket _supportTicket = new SupportTicket
+                {
+                    MachineId = machineId,
+                    TicketOpenedBy = ticketOpenedBy,
+                    DateReported = dateReported,
+                    IssueDescription = issueDescription,
+                    IssueDetail = issueDetail
+                };
+
+                var vResults = new List<ValidationResult>();
+                var vContext = new ValidationContext(_supportTicket);
+                bool isValid = Validator.TryValidateObject(_supportTicket, vContext, vResults, true);
+
+                if (!isValid)
+                {
+                    Console.WriteLine();
+                    foreach (var res in vResults)
+                    {
+                        Console.WriteLine($"{((string[])res.MemberNames)[0]} threw an error of:\r\n\t {res.ErrorMessage.ToString()}");
+                        if (((string[])res.MemberNames)[0] == "IssueDescription")
+                        {
+                            Console.WriteLine("Please enter a description that is 50 characters or less.");
+                            do
+                            {
+                                issueDescription = GetTextFromConsole(5, false);
+                            } while (issueDescription.Count() <= 50);
+                            _supportTicket.IssueDescription = issueDescription;
+                        }
+                    }
+                    Console.WriteLine("Hit anykey to continue...");
+                    Console.ReadKey();
+                }
+                Console.WriteLine("Saving new Support Ticket");
+                using (MachineContext context = new MachineContext())
+                {
+                    context.SupportTicket.Add(_supportTicket);
+                    context.SaveChanges();
+                    Console.WriteLine("Save complete!");
+                }
+            }
+        }
+
+        static List<SupportTicket> GetListOfSupportTickets()
+        {
+            List<SupportTicket> lticket = new List<SupportTicket>();
+            MachineContext context = new MachineContext();
+            lticket = context.SupportTicket.ToList();
+            context.Dispose();
+            return lticket;
+        }
+
+        static string DisplaySupportTickets()
+        {
+            Console.Clear();
+            List<SupportTicket> lTickets = GetListOfSupportTickets();
+            Console.WriteLine("Machine ID | IS Closed | Issue Details");
+            foreach (SupportTicket m in lTickets)
+            {
+                Console.WriteLine($"{m.MachineId,-11}|  {m.DateResolved.HasValue,-11}| {m.IssueDetail}");
+            }
+
+            Console.WriteLine("\r\nEnter the MachineId followed by the Enter Key for more information.");
+            Console.WriteLine("Hit the Esc key at anytime to exit the menu.");
+
+            string machineId = GetNumbersFromConsole();
+            if (machineId.Length > 0)
+            {
+                int machId = Convert.ToInt32(machineId);
+                DisplayMachineDetail(machId);
+            }
+            return machineId;
         }
 
         static void SeedOperatingSystemTable()
