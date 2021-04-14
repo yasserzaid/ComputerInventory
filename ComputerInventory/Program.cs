@@ -6,6 +6,7 @@ using ComputerInventory.Models;
 using ComputerInventory.Context;
 using System.Data.Common;
 using System.ComponentModel.DataAnnotations;
+using Microsoft.Data.SqlClient;
 
 namespace ComputerInventory
 {
@@ -90,7 +91,7 @@ namespace ComputerInventory
                         PageAndFilterOperatingSystems();
                         Console.ReadKey();
                     }
-                    else if(result==7)
+                    else if (result == 7)
                     {
                         SupportMenu();
                     }
@@ -1634,7 +1635,7 @@ namespace ComputerInventory
                 }
 
                 Console.WriteLine();
-                
+
                 // Another Way
                 var rightJoin = from mw in context.MachineWarranty
                                 join m in context.Machine on mw.MachineId equals m.MachineId into rJoin
@@ -1987,6 +1988,8 @@ namespace ComputerInventory
                 Console.WriteLine("1. Create a New Support Ticket");
                 Console.WriteLine("2. Update a Support Ticket");
                 Console.WriteLine("3. View All Tickets");
+                Console.WriteLine("4. View Support Log By Support Ticket ID Using Stored Procedure");
+                Console.WriteLine("5. Create a New Support Ticket Using Stored Procedure");
                 Console.WriteLine("9. Exit Menu");
                 cki = Console.ReadKey();
                 try
@@ -2003,6 +2006,61 @@ namespace ComputerInventory
                     else if (result == 3)
                     {
                         DisplaySupportTickets();
+
+                        //cSupportTicketLogEntry.ViewSupportTickets();
+                    }
+                    else if (result == 4)
+                    {
+                        using (MachineContext context = new MachineContext())
+                        {
+                            context.Database.OpenConnection();
+
+                            // First Way
+                            List<SupportLog> lst = context.SupportLog.FromSqlRaw("dbo.sp_GetSupportLogEntries @p0", 1).ToList();
+
+                            // Second Way
+                            //var sTicketIdParam = new SqlParameter("@SupportTicketID", 1);
+                            //List<SupportLog> lst = context.SupportLog.FromSqlRaw("sp_GetSupportLogEntries @SupportTicketID", sTicketIdParam).ToList();
+
+                            // third Way
+                            //List<SupportLog> lst = context.SupportLog.FromSqlRaw("sp_GetSupportLogEntries {0}", 1).ToList();
+                        }
+                    }
+                    else if (result == 5)
+                    {
+                        using (MachineContext context = new MachineContext())
+                        {
+                            // First Way
+                            //context.Database.OpenConnection();
+
+                            //var userNameParam = new SqlParameter("@UserName", "Derek");
+                            //var enteredOnParam = new SqlParameter("@EnteredOn", DateTime.Now);
+                            //var issueDescriptionParam = new SqlParameter("@IssueDescription", "Needs Office 2016");
+                            //var issueDetailParam = new SqlParameter("@IssueDetail", "Bob needs Office 2016 installed so he can do his job.");
+                            //var machineIdParam = new SqlParameter("@MachineId", 3);
+                            //context.Database.ExecuteSqlCommand("sp_AddNewSupportTicket @UserName,@EnteredOn, @IssueDescription, @IssueDetail, @MachineId", userNameParam, enteredOnParam, issueDescriptionParam, issueDetailParam, machineIdParam);
+
+
+                            // Second Way
+                            context.Database.OpenConnection();
+
+                            var userNameParam = new SqlParameter("@UserName", "Derek");
+                            var enteredOnParam = new SqlParameter("@EnteredOn", DateTime.Now);
+                            var issueDescriptionParam = new SqlParameter("@IssueDescription", "Needs Office 2016");
+                            var issueDetailParam = new SqlParameter("@IssueDetail", "Bob needs Office 2016 installed so he can do his job.");
+                            var machineIdParam = new SqlParameter("@MachineId", 3);
+
+                            var outputParam = new SqlParameter
+                            {
+                                ParameterName = "@NewSupportTicktId",
+                                DbType = System.Data.DbType.Int32,
+                                Direction = System.Data.ParameterDirection.Output
+                            };
+
+                            context.Database.ExecuteSqlCommand("sp_AddNewSupportTicket @UserName,@EnteredOn, @IssueDescription, @IssueDetail, @MachineId, @NewSupportTicktId OUTPUT", userNameParam, enteredOnParam, issueDescriptionParam, issueDetailParam, machineIdParam, outputParam);
+
+                            var SupportTicktId = outputParam.Value.ToString();
+                        }
                     }
                     else if (result == 9)
                     {
@@ -2141,5 +2199,6 @@ namespace ComputerInventory
                 context.SaveChanges();
             }
         }
+
     }
 }

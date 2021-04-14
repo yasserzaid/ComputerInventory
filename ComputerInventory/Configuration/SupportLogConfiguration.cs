@@ -18,8 +18,11 @@ namespace ComputerInventory.Configuration
                .IsRequired()
                .IsUnicode(true);
 
+            //builder.Property(e => e.SupportLogEntryDate)
+            //    .HasColumnType("date");
+
             builder.Property(e => e.SupportLogEntryDate)
-                .HasColumnType("date");
+                .HasColumnType("datetime");
 
             builder.Property(e => e.SupportLogUpdatedBy)
                 .IsRequired()

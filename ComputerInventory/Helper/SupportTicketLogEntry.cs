@@ -25,7 +25,7 @@ namespace ComputerInventory
                     SupportTicketId = ticketId,
                     SupportLogEntry = entry,
                     SupportLogUpdatedBy = Environment.UserName,
-                    SupportLogEntryDate = DateTime.Now
+                    SupportLogEntryDate = DateTime.Now //DateTime.Now.AddSeconds(-2000)
                 };
                 modelIsValid = mv.ValidateSupportLog(sLogEntry, "save");
                 if (modelIsValid)
@@ -157,6 +157,38 @@ namespace ComputerInventory
             else
             {
                 Console.WriteLine("I'm sorry it looks like you are having trouble, please try again later.");
+            }
+            Console.WriteLine("Hit any key to continue...");
+            Console.ReadKey();
+        }
+
+        public void ViewSupportTickets()
+        {
+            Console.Clear();
+            cHelper.WriteHeader("Open Support Tickets");
+            List<SupportTicket> openTickets = RetreiveOpenTickets();
+            foreach (var ticket in openTickets)
+            {
+                Console.WriteLine($"Ticket Number: {ticket.SupportTicketId}Machine Name: { ticket.Machine.Name}\r\n Description: {ticket.IssueDescription}");
+            }
+            Console.WriteLine("\r\nPlease Select an Open Support Ticket from the List\r\nOtherwise hit the ESC key to exit");
+            int ticketId = cHelper.GetNumbersFromConsole();
+            if (ticketId > 0)
+            {
+                ViewTicketLog(ticketId);
+            }
+        }
+
+        public void ViewTicketLog(int supportTicketId)
+        {
+            List<SupportLog> logEntries = RetreiveLogEntries(supportTicketId);
+            Console.Clear();
+            cHelper.WriteHeader("Support Ticket Log");
+            foreach (var log in logEntries)
+            {
+                Console.WriteLine($"{log.SupportLogEntryDate}: {log.SupportLogEntry}");
+                Console.WriteLine($" Entered By: {log.SupportLogUpdatedBy}");
+                Console.WriteLine("==============================");
             }
             Console.WriteLine("Hit any key to continue...");
             Console.ReadKey();
